@@ -2,7 +2,7 @@ package ca.uwaterloo.abeln.farm.dt
 
 import ca.uwaterloo.abeln.farm.dt.Names.{Global, Name, Quote}
 import ca.uwaterloo.abeln.farm.dt.Parsers.Tree
-import ca.uwaterloo.abeln.farm.dt.Results.Result
+import ca.uwaterloo.abeln.farm.dt.Results.{Result, error}
 
 object Terms {
 
@@ -38,7 +38,7 @@ object Terms {
     term match {
       case Ann(term1, tpe) => Ann(substCheck(level, term1, free), tpe)
       case Star => Star
-      case Pi(from, to) => Pi(substCheck(level + 1, from, free), substCheck(level + 1, to, free))
+      case Pi(from, to) => Pi(substCheck(level, from, free), substCheck(level + 1, to, free))
       case Bound(binder) =>
         if (binder == level) free
         else term
@@ -93,21 +93,29 @@ object Terms {
     }
   }
 
-  def removeNames0(tree: Tree): Result[ChkTerm] = removeNames(tree, Nil)
+  def removeNamesInf0(tree: Tree): Result[InfTerm] = {
+    removeNamesChk0(tree) match {
+      case Right(WrapInf(inf)) => Right(inf)
+      case Right(term) => error(s"expected an inf term, but got: $term")
+      case Left(err) => Left(err)
+    }
+  }
 
-  def removeNames(tree: Tree, ctx: List[String]): Result[ChkTerm] = {
+  def removeNamesChk0(tree: Tree): Result[ChkTerm] = removeNamesChk(tree, Nil)
+
+  def removeNamesChk(tree: Tree, ctx: List[String]): Result[ChkTerm] = {
     val P = Parsers
     tree match {
       case P.Ann(term, tpe) =>
         for {
-          term1 <- removeNames(term, ctx)
-          tpe1 <- removeNames(tpe, ctx)
+          term1 <- removeNamesChk(term, ctx)
+          tpe1 <- removeNamesChk(tpe, ctx)
         } yield WrapInf(Ann(term1, tpe1))
       case P.Star => Right(WrapInf(Star))
       case P.Pi(binder, from, to) =>
         for {
-          from1 <- removeNames(from, ctx)
-          to1 <- removeNames(to, binder :: ctx)
+          from1 <- removeNamesChk(from, ctx)
+          to1 <- removeNamesChk(to, binder :: ctx)
         } yield WrapInf(Pi(from1, to1))
       case P.Var(name) =>
         ctx.indexWhere(_ == name) match {
@@ -118,19 +126,19 @@ object Terms {
       case P.App(fn, arg) =>
         def checkInf(fn: ChkTerm): Result[ChkTerm] = {
           fn match {
-            case WrapInf(inf) => Right(fn)
+            case WrapInf(_) => Right(fn)
             case _: Lam => Left(s"expected an inf term on the lhs of an app")
           }
         }
         def toInf(term: ChkTerm): InfTerm = term.asInstanceOf[WrapInf].term
         for {
-          fn1 <- removeNames(fn, ctx)
+          fn1 <- removeNamesChk(fn, ctx)
           _ <- checkInf(fn1)
-          arg1 <- removeNames(arg, ctx)
+          arg1 <- removeNamesChk(arg, ctx)
         } yield WrapInf(App(toInf(fn1), arg1))
       case P.Lam(binder, body) =>
         for {
-          body1 <- removeNames(body, binder :: ctx)
+          body1 <- removeNamesChk(body, binder :: ctx)
         } yield Lam(body1)
     }
   }

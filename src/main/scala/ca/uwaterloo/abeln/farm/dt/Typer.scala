@@ -11,6 +11,8 @@ object Typer {
 
   type Context = List[(Name, Type)]
 
+  val emptyCtx: Context = Nil
+
   def lookup(ctx: Context, name: Name): Option[Type] = {
     for (pair <- ctx.find(_._1 == name)) yield pair._2
   }
@@ -20,7 +22,7 @@ object Typer {
   }
 
   def typeInf(level: Int, ctx: Context, term: InfTerm): Result[Type] = {
-    term match {
+   val res = term match {
       case Ann(term1, tpe) =>
         for {
           _ <- typeCheck(level, ctx, tpe, VStar)
@@ -54,20 +56,22 @@ object Typer {
           case err: Left[String, Type] => err
         }
     }
+//    println(s"inf level = $level term = $term ctx = $ctx res = $res")
+    res
   }
 
-  def checkEquiv(res: Type, exp: Type): Result[Type] = {
+  def checkEquiv(term: InfTerm, res: Type, exp: Type): Result[Type] = {
     if (equiv(res, exp)) Right(res)
-    else error(s"expected: $exp, but got $res")
+    else error(s"term: $term, expected: $exp, but got $res")
   }
 
-  def typeCheck(level: Int, ctx: Context, term: ChkTerm, proto: Type): Result[Type] = {
-    term match {
+  def typeCheck(level: Int, ctx: Context, term: ChkTerm, proto: Type): Result[Unit] = {
+    val res = term match {
       case WrapInf(term1) =>
         for {
           res <- typeInf(level, ctx, term1)
-          _ <- checkEquiv(res, proto)
-        } yield proto
+          _ <- checkEquiv(term1, res, proto)
+        } yield ()
       case Lam(body) =>
         proto match {
           case VPi(from, to) =>
@@ -75,8 +79,11 @@ object Typer {
             val ctx1 = (name, from) :: ctx
             val body1 = substCheck(0, body, Free(name))
             typeCheck(level + 1, ctx1, body1, to(vfree(name)))
+            Right(())
           case _ => error(s"typing a lambda, but proto is $proto")
         }
     }
+//    println(s"chk level = $level term = $term proto = $proto ctx = $ctx")
+    res
   }
 }
