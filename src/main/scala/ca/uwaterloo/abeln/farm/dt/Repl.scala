@@ -14,6 +14,7 @@ object Repl {
   def typeTree(tree: Parsers.Tree): Result[ChkTerm] = {
     removeNamesInf0(tree) match {
       case Right(infTerm) =>
+//        println(s"term: $infTerm")
         typeInf0(ctx, infTerm) match {
           case Right(tpe) => Right(quote0(tpe): ChkTerm)
           case Left(err) => Left(err)
@@ -38,7 +39,7 @@ object Repl {
             }
           case Expr(expr) =>
             typeTree(expr) match {
-              case Right(chkTerm) => println(s"$chkTerm")
+              case Right(chkTerm) => println(s"${showChk0(chkTerm)}")
               case Left(err) => println(s"type error: $err")
             }
         }

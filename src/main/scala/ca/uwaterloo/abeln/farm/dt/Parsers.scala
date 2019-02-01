@@ -23,17 +23,21 @@ object Parsers extends JavaTokenParsers {
   case class Ann(term: Tree, tpe: Tree) extends Tree
   case object Star extends Tree
   case class Pi(binder: String, from: Tree, to: Tree) extends Tree
+  case class Arrow(from: Tree, to: Tree) extends Tree
   case class Var(name: String) extends Tree
   case class App(fn: Tree, arg: Tree) extends Tree
   case class Lam(binder: String, body: Tree) extends Tree
 
   def sexp[T](p: Parser[T]): Parser[T] = ("(" ~> p) <~ ")"
 
-  def tree: Parser[Tree] = ann | star | pi | free | app | lam
+  def tree: Parser[Tree] = ann | star | pi | arrow | free | app | lam
   def ann: Parser[Tree] =  sexp(("::" ~> tree) ~ tree) ^^ { case ~(term, tpe) => Ann(term, tpe) }
   def star: Parser[Tree] = "*" ^^ { _ => Star }
   def pi: Parser[Tree] = sexp(("pi" ~> ident) ~ (tree ~ tree)) ^^ {
     case ~(id, ~(from, to)) => Pi(id, from, to)
+  }
+  def arrow: Parser[Tree] = sexp("=>" ~> (tree ~ tree)) ^^ {
+    case ~(from, to) => Arrow(from, to)
   }
   def free: Parser[Tree] = ident ^? { case id if id != "*" => Var(id) }
   def app: Parser[Tree] = sexp(tree ~ tree) ^^ { case ~(fn, arg) => App(fn, arg) }

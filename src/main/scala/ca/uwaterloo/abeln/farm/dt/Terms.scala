@@ -117,6 +117,12 @@ object Terms {
           from1 <- removeNamesChk(from, ctx)
           to1 <- removeNamesChk(to, binder :: ctx)
         } yield WrapInf(Pi(from1, to1))
+      case P.Arrow(from, to) =>
+        val ctx1 = "" :: ctx // augment the context with a dummy binder
+        for {
+          from1 <- removeNamesChk(from, ctx)
+          to1 <- removeNamesChk(to, ctx1)
+        } yield WrapInf(Pi(from1, to1))
       case P.Var(name) =>
         ctx.indexWhere(_ == name) match {
           case -1 => Right(WrapInf(Free(Global(name))))
@@ -140,6 +146,37 @@ object Terms {
         for {
           body1 <- removeNamesChk(body, binder :: ctx)
         } yield Lam(body1)
+    }
+  }
+
+
+  def showChk0(term: ChkTerm): String = {
+    showChk(level = 0, term, Nil)
+  }
+
+  def showChk(level: Int, term: ChkTerm, names: List[String]): String = {
+    term match {
+      case WrapInf(term1) => showInf(level, term1, names)
+      case Lam(term1) =>
+        val binder = s"x$level"
+        s"λ$binder." ++ showChk(level + 1, term1, binder :: names)
+    }
+  }
+
+  def showInf(level: Int, term: InfTerm, names: List[String]): String = {
+    term match {
+      case Ann(term1, tpe) => "(" ++ showChk(level, term1, names) ++ ")" ++ " :: " ++ showChk(level, tpe, names)
+      case Star => "*"
+      case Pi(from, to) =>
+        val binder = s"x$level"
+        s"∀($binder: ${showChk(level, from, names)}).${showChk(level + 1, to, binder :: names)}"
+      case Bound(binder) => names(binder)
+      case Free(name) =>
+        name match {
+          case Global(nameStr) => nameStr
+          case _ => sys.error(s"unexpected name $name")
+        }
+      case App(fn, arg) => "(" ++ showInf(level, fn, names) ++ ") " ++ showChk(level, arg, names)
     }
   }
 }
