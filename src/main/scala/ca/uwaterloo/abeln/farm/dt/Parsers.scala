@@ -13,11 +13,13 @@ object Parsers extends JavaTokenParsers {
 
   sealed trait Cmd
   case class Let(id: String, term: Tree) extends Cmd
+  case class Assume(id: String, tpe: Tree) extends Cmd
   case class Expr(tree: Tree) extends Cmd
 
-  def cmd: Parser[Cmd] = let | expr
+  def cmd: Parser[Cmd] = let | expr | assume
   def let: Parser[Cmd] = sexp(("let" ~> ident) ~ tree) ^^ { case ~(id, expr) => Let(id, expr) }
   def expr: Parser[Cmd] = tree ^^ Expr
+  def assume: Parser[Cmd] = sexp(("assume" ~> ident) ~ tree) ^^ { case ~(id, tpe) => Assume(id, tpe) }
 
   sealed trait Tree
   case class Ann(term: Tree, tpe: Tree) extends Tree
