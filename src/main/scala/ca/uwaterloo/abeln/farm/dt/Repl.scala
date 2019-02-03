@@ -48,6 +48,7 @@ object Repl {
       case P.NatElim(mot, base, ind, num) =>
         P.NatElim(close(mot, tmap), close(base, tmap), close(ind, tmap), close(num, tmap))
       case P.Nat => P.Nat
+      case P.Succ(prev) => P.Succ(close(prev, tmap))
     }
   }
 

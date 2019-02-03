@@ -32,11 +32,11 @@ object Parsers extends JavaTokenParsers {
   case class Num(n: Int) extends Tree
   case class NatElim(motive: Tree, base: Tree, ind: Tree, num: Tree) extends Tree
   case object Nat extends Tree
-//  case class Succ(prev: Tree) extends Tree
+  case class Succ(prev: Tree) extends Tree
 
   def sexp[T](p: Parser[T]): Parser[T] = ("(" ~> p) <~ ")"
 
-  def tree: Parser[Tree] = ann | star | pi | arrow | nat | free | app | lam | num | natElim
+  def tree: Parser[Tree] = ann | star | pi | arrow | nat | free | lam | num | natElim | succ | app
   def ann: Parser[Tree] =  sexp(("::" ~> tree) ~ tree) ^^ { case ~(term, tpe) => Ann(term, tpe) }
   def star: Parser[Tree] = "*" ^^ { _ => Star }
   def pi: Parser[Tree] = sexp(("pi" ~> ident) ~ (tree ~ tree)) ^^ {
@@ -56,5 +56,5 @@ object Parsers extends JavaTokenParsers {
     case ~(~(~(mot, base), ind), num) => NatElim(mot, base, ind, num)
   }
 
-//  def succ: Parser[Tree] = sexp((""))
+  def succ: Parser[Tree] = sexp("succ" ~> tree) ^^ Succ
 }

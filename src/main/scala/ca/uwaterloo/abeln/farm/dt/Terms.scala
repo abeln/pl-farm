@@ -183,9 +183,16 @@ object Terms {
           numTerm  <- removeNamesChk(num, ctx)
         } yield WrapInf(NatElim(motTerm, baseTerm, indTerm, numTerm))
       case P.Nat => Right(WrapInf(Nat))
+      case P.Succ(prev) =>
+        for {
+          prevTerm <- removeNamesChk(prev, ctx)
+        } yield WrapInf(Succ(prevTerm))
     }
   }
 
+  def showTpe(tpe: Type): String = {
+    showChk0(quote0(tpe))
+  }
 
   def showChk0(term: ChkTerm): String = {
     showChk(level = 0, term, Nil)
@@ -211,7 +218,7 @@ object Terms {
       case Free(name) =>
         name match {
           case Global(nameStr) => nameStr
-          case _ => sys.error(s"unexpected name $name")
+          case _ => name.toString
         }
       case App(fn, arg) => "(" ++ showInf(level, fn, names) ++ ") " ++ showChk(level, arg, names)
       case Nat => "Nat"

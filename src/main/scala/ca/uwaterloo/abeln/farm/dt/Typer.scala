@@ -80,7 +80,7 @@ object Typer {
 
   def checkEquiv(term: InfTerm, res: Type, exp: Type): Result[Type] = {
     if (equiv(res, exp)) Right(res)
-    else error(s"term: $term, expected: $exp, but got $res")
+    else error(s"term: ${showChk0(WrapInf(term))} expected: ${showTpe(exp)}, but got ${showTpe(res)}")
   }
 
   def typeCheck(level: Int, ctx: Context, term: ChkTerm, proto: Type): Result[Unit] = {
