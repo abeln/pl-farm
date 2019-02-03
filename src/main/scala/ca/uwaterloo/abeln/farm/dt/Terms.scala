@@ -36,7 +36,7 @@ object Terms {
   case class VSucc(n: Value) extends Value
   case class VVec(tpe: Value, len: Value) extends Value
   case class VNil(tpe: Value) extends Value
-  case class VCons(tpe: Value, len: Value, head: Value, vec: Value) extends Value
+  case class VCons(tpe: Value, len: Value, head: Value, tail: Value) extends Value
 
   sealed trait Neutral
   case class NValue(value: Value) extends Neutral
@@ -282,7 +282,7 @@ object Terms {
       case TNil(tpe) =>
         s"nil(${showChk(level, tpe, names)})"
       case Cons(tpe, len, head, tail) =>
-        s"cons(${sc(tpe)}, ${sc(len)}, ${sc(head)}, ${sc(tail)})"
+        s"cons(${sc(head)}, ${sc(tail)})"
       case VecElim(tpe, mot, base, ind, len, vec) =>
         s"velim(${sc(tpe)}, ${sc(mot)}, ${sc(base)}, ${sc(ind)}, ${sc(len)}, ${sc(vec)})"
       case Vec(tpe, len) =>
