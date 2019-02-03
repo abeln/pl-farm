@@ -7,5 +7,7 @@ object Predef {
       | (assume Bool *)
       | (assume true Bool)
       | (assume false Bool)
+      |
+      | (let plus (:: (lam arg (nelim (lam m (=> Nat Nat)) (lam n n) (lam n (lam prevFn (lam x (succ (prevFn x))))) arg)) (=> Nat (=> Nat Nat))))
     """.stripMargin.lines.toList
 }

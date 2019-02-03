@@ -94,15 +94,18 @@ object Repl {
     }
   }
 
-  def loop(): Unit = {
+  def repl(): Unit = {
     Predef.defs.filter(_.trim.nonEmpty).foreach(proc)
-    print(">> ")
-    val line = readLine()
-    proc(line)
+    def loop(): Unit = {
+      print(">> ")
+      val line = readLine()
+      proc(line)
+      loop()
+    }
     loop()
   }
 
   def main(args: Array[String]): Unit = {
-    loop()
+    repl()
   }
 }
