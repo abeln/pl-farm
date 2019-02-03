@@ -59,9 +59,7 @@ object Repl {
     }
   }
 
-  def loop(): Unit = {
-    print(">> ")
-    val line = readLine()
+  def proc(line: String): Unit = {
     parseCmd(line) match {
       case Right(cmd) =>
         cmd match {
@@ -71,6 +69,7 @@ object Repl {
               case Right(WrapInf(Star)) =>
                 val vTpe = evalTree(closedTpe)
                 ctx = (Global(id), vTpe) :: ctx
+                println(s"(assume $id ${showChk0(quote0(vTpe))})")
               case _: Right[String, ChkTerm] =>
                 println("error: expected a type in the rhs of a let")
               case Left(err) => println(s"type error: $err")
@@ -93,6 +92,13 @@ object Repl {
         }
       case Left(err) => println(s"parse error: $err")
     }
+  }
+
+  def loop(): Unit = {
+    Predef.defs.filter(_.trim.nonEmpty).foreach(proc)
+    print(">> ")
+    val line = readLine()
+    proc(line)
     loop()
   }
 
