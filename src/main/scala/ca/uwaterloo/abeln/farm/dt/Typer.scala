@@ -4,7 +4,7 @@ import ca.uwaterloo.abeln.farm.dt.Names.Local
 import ca.uwaterloo.abeln.farm.dt.Terms._
 import ca.uwaterloo.abeln.farm.dt.Names.Name
 import ca.uwaterloo.abeln.farm.dt.Results.{Result, error}
-import ca.uwaterloo.abeln.farm.dt.Eval.{evalChk, emptyEnv, evalApp}
+import ca.uwaterloo.abeln.farm.dt.Eval.{evalChk, emptyEnv, evalApp, evalCurriedApp}
 
 
 object Typer {
@@ -62,7 +62,7 @@ object Typer {
          _ <- typeCheck(level, ctx, pred, VNat)
        } yield VNat
       case NatElim(mot, base, ind, num) =>
-       val res = for {
+       for {
          _ <- typeCheck(level, ctx, mot, VPi(VNat, _ => VStar))
          motVal = evalChk(mot, Nil)
          expZeroTpe = evalApp(motVal, VZero)
@@ -72,7 +72,58 @@ object Typer {
          _ <- typeCheck(level, ctx, num, VNat)
          numVal = evalChk(num, Nil)
        } yield evalApp(motVal, numVal)
-       res
+      case TNil(tpe) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+       } yield VVec(vTpe, VZero)
+      case Vec(tpe, len) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         _ <- typeCheck(level, ctx, len, VNat)
+         vLen = evalChk(len, Nil)
+       } yield VStar
+      case Cons(tpe, len, head, tail) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         _ <- typeCheck(level, ctx, len, VNat)
+         vLen = evalChk(len, Nil)
+         _ <- typeCheck(level, ctx, head, vTpe)
+         vHead = evalChk(head, Nil)
+         _ <- typeCheck(level, ctx, tail, VVec(vTpe, vLen))
+         vTail = evalChk(tail, Nil)
+       } yield VVec(vTpe, VSucc(vLen))
+      case VecElim(tpe, motive, base, ind, argLen, argVec) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         expMotiveTpe = VPi(VNat, (len: Value) => VPi(VVec(vTpe, len), (ignore: Value) => VStar))
+         _ <- typeCheck(level, ctx, motive, expMotiveTpe)
+         vMotive = evalChk(motive, Nil)
+         expBaseTpe = evalCurriedApp(vMotive, VZero, VNil(vTpe))
+         _ <- typeCheck(level, ctx, base, expBaseTpe)
+         vBase = evalChk(base, Nil)
+         expIndTpe = VPi(
+           VNat,
+           (len: Value) =>
+             VPi(vTpe,
+               (head: Value) =>
+                 VPi(VVec(vTpe, len),
+                   (tail: Value) => {
+                     val evidenceTpe = evalCurriedApp(vMotive, len, tail)
+                     val expTpe = evalCurriedApp(vMotive, VSucc(len), VCons(vTpe, len, head, tail))
+                     VPi(evidenceTpe, _ => expTpe)
+                   }
+             )))
+         _ <- typeCheck(level, ctx, ind, expIndTpe)
+         vInd = evalChk(ind, Nil)
+         _ <- typeCheck(level, ctx, argLen, VNat)
+         vLen = evalChk(argLen, Nil)
+         _ <- typeCheck(level, ctx, argVec, VVec(vTpe, vLen))
+         vVec = evalChk(argVec, Nil)
+       } yield evalCurriedApp(vMotive, vLen, vVec)
     }
 //    println(s"inf level = $level term = $term ctx = $ctx res = $res")
     res

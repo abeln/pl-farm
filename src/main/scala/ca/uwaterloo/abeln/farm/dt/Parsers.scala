@@ -33,10 +33,14 @@ object Parsers extends JavaTokenParsers {
   case class NatElim(motive: Tree, base: Tree, ind: Tree, num: Tree) extends Tree
   case object Nat extends Tree
   case class Succ(prev: Tree) extends Tree
+  case class TNil(tpe: Tree) extends Tree
+  case class Vec(tpe: Tree, len: Tree) extends Tree
+  case class Cons(tpe: Tree, len: Tree, head: Tree, tail: Tree) extends Tree
+  case class VecElim(tpe: Tree, mot: Tree, base: Tree, ind: Tree, len: Tree, arg: Tree) extends Tree
 
   def sexp[T](p: Parser[T]): Parser[T] = ("(" ~> p) <~ ")"
 
-  def tree: Parser[Tree] = ann | star | pi | arrow | nat | free | lam | num | natElim | succ | app
+  def tree: Parser[Tree] = ann | star | pi | arrow | nat | free | lam | num | natElim | succ | tnil | vec | cons | vecElim | app
   def ann: Parser[Tree] =  sexp(("::" ~> tree) ~ tree) ^^ { case ~(term, tpe) => Ann(term, tpe) }
   def star: Parser[Tree] = "*" ^^ { _ => Star }
   def pi: Parser[Tree] = sexp(("pi" ~> ident) ~ (tree ~ tree)) ^^ {
@@ -52,9 +56,25 @@ object Parsers extends JavaTokenParsers {
 
   def nat: Parser[Tree] = "Nat" ^^ { _ => Nat }
 
-  def natElim: Parser[Tree] = sexp(((("natelim" ~> tree) ~ tree) ~ tree) ~ tree) ^^ {
+  def natElim: Parser[Tree] = sexp(((("nelim" ~> tree) ~ tree) ~ tree) ~ tree) ^^ {
     case ~(~(~(mot, base), ind), num) => NatElim(mot, base, ind, num)
   }
 
   def succ: Parser[Tree] = sexp("succ" ~> tree) ^^ Succ
+
+  def tnil: Parser[Tree] = sexp("nil" ~> tree) ^^ TNil
+
+  def vec: Parser[Tree] = sexp("Vec" ~> (tree ~ tree)) ^^ {
+    case ~(tpe, len) => Vec(tpe, len)
+  }
+
+  def cons: Parser[Tree] = sexp("cons" ~> (((tree ~ tree) ~ tree) ~ tree)) ^^ {
+    case ~(~(~(tpe, len), head), tail) =>
+      Cons(tpe, len, head, tail)
+  }
+
+  def vecElim: Parser[Tree] = sexp("velim" ~> (((((tree ~ tree) ~ tree) ~ tree) ~ tree) ~ tree)) ^^ {
+    case ~(~(~(~(~(tpe, mot), base), ind), len), vec) =>
+      VecElim(tpe, mot, base, ind, len, vec)
+  }
 }

@@ -15,6 +15,12 @@ object Eval {
     }
   }
 
+  def evalCurriedApp(fnVal: Value, args: Value*): Value = {
+    args.foldLeft(fnVal) {
+      case (fn, arg) => evalApp(fn, arg)
+    }
+  }
+
   def evalInf(term: InfTerm, env: Env): Value = {
     term match {
       case Ann(term1, _) => evalChk(term1, env)
@@ -46,6 +52,28 @@ object Eval {
           }
         }
         elim(vNum)
+      case Vec(tpe, len) => VVec(evalChk(tpe, env), evalChk(len, env))
+      case TNil(tpe) => VNil(evalChk(tpe, env))
+      case Cons(tpe, len, head, vec) =>
+        VCons(evalChk(tpe, env), evalChk(len, env), evalChk(head, env), evalChk(vec, env))
+      case VecElim(tpe, motive, base, ind, argLen, argVec) =>
+        val vTpe = evalChk(tpe, env)
+        val vMot = evalChk(motive, env)
+        val vBase = evalChk(base, env)
+        val vInd = evalChk(ind, env)
+        val vArgLen = evalChk(argLen, env)
+        val vArgVec = evalChk(argVec, env)
+        def elim(vecVal: Value): Value = {
+          vecVal match {
+            case VNil(_) => vBase
+            case VCons(_, len, head, tail) =>
+              val recRes = evalCurriedApp(vMot, len, tail)
+              evalCurriedApp(vInd, len, head, tail, recRes)
+            case _ =>
+              VNeutral(NVecElim(vTpe, vMot, vBase, vInd, vArgLen, vArgVec))
+          }
+        }
+        elim(vArgVec)
     }
   }
 

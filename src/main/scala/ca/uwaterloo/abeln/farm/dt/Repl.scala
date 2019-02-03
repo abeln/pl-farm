@@ -31,6 +31,7 @@ object Repl {
   }
 
   def close(tree: Tree, tmap: Map[String, P.Tree]): Tree = {
+    def cl(tree: Tree) = close(tree, tmap)
     tree match {
       case P.Ann(term, tpe) => P.Ann(close(term, tmap), close(tpe, tmap))
       case P.Star => P.Star
@@ -49,6 +50,12 @@ object Repl {
         P.NatElim(close(mot, tmap), close(base, tmap), close(ind, tmap), close(num, tmap))
       case P.Nat => P.Nat
       case P.Succ(prev) => P.Succ(close(prev, tmap))
+      case P.TNil(tpe) => P.TNil(cl(tpe))
+      case P.Vec(tpe, len) => P.Vec(cl(tpe), cl(len))
+      case P.Cons(tpe, len, head, tail) =>
+        P.Cons(cl(tpe), cl(len), cl(head), cl(tail))
+      case P.VecElim(tpe, mot, base, ind, len, arg) =>
+        P.VecElim(cl(tpe), cl(mot), cl(base), cl(ind), cl(len), cl(arg))
     }
   }
 

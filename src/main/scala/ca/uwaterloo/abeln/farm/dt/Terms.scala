@@ -17,6 +17,10 @@ object Terms {
   case object Zero extends InfTerm
   case class Succ(n: ChkTerm) extends InfTerm
   case class NatElim(motive: ChkTerm, base: ChkTerm, ind: ChkTerm, num: ChkTerm) extends InfTerm
+  case class Vec(tpe: ChkTerm, len: ChkTerm) extends InfTerm
+  case class TNil(tpe: ChkTerm) extends InfTerm
+  case class Cons(tpe: ChkTerm, len: ChkTerm, head: ChkTerm, vec: ChkTerm) extends InfTerm
+  case class VecElim(tpe: ChkTerm, motive: ChkTerm, base: ChkTerm, ind: ChkTerm, len: ChkTerm, vec: ChkTerm) extends InfTerm
 
   sealed trait ChkTerm
   case class WrapInf(term: InfTerm) extends ChkTerm
@@ -30,12 +34,16 @@ object Terms {
   case object VNat extends Value
   case object VZero extends Value
   case class VSucc(n: Value) extends Value
+  case class VVec(tpe: Value, len: Value) extends Value
+  case class VNil(tpe: Value) extends Value
+  case class VCons(tpe: Value, len: Value, head: Value, vec: Value) extends Value
 
   sealed trait Neutral
   case class NValue(value: Value) extends Neutral
   case class NFree(name: Name) extends Neutral
   case class NApp(fn: Value, arg: Value) extends Neutral
   case class NNatElim(motive: Value, base: Value, ind: Value, num: Value) extends Neutral
+  case class NVecElim(tpe: Value, motive: Value, base: Value, ind: Value, argLen: Value, argVec: Value) extends Neutral
 
   type Type = Value // dependent types!
 
@@ -59,6 +67,12 @@ object Terms {
       case Succ(prev) => Succ(substCheck(level, prev, free))
       case NatElim(motive, base, ind, num) =>
         NatElim(recChk(motive), recChk(base), recChk(ind), recChk(num))
+      case Vec(tpe, len) => Vec(recChk(tpe), recChk(len))
+      case TNil(tpe) => TNil(recChk(tpe))
+      case Cons(tpe, len, head, vec) =>
+        Cons(recChk(tpe), recChk(len), recChk(head), recChk(vec))
+      case VecElim(tpe, motive, base, ind, len, vec) =>
+        VecElim(recChk(tpe), recChk(motive), recChk(base), recChk(ind), recChk(len), recChk(vec))
     }
   }
 
@@ -95,6 +109,10 @@ object Terms {
       case VZero => WrapInf(Zero)
       case VSucc(pred) => WrapInf(Succ(quote(level, pred)))
       case VNat => WrapInf(Nat)
+      case VVec(tpe, len) => WrapInf(Vec(quote(level, tpe), quote(level, len)))
+      case VNil(tpe) => WrapInf(TNil(quote(level, tpe)))
+      case VCons(tpe, len, head, tail) =>
+        WrapInf(Cons(quote(level, tpe), quote(level, len), quote(level, head), quote(level, tail)))
     }
   }
 
@@ -105,6 +123,9 @@ object Terms {
       case NNatElim(motive, base, ind, num) =>
         NatElim(quote(level, motive), quote(level, base), quote(level, ind), quote(level, num))
       case NValue(vl) => quoteInf(level, vl)
+      case NVecElim(tpe, motive, base, ind, len, vec) =>
+        def q(v: Value) = quote(level, v)
+        VecElim(q(tpe), q(motive), q(base), q(ind), q(len), q(vec))
     }
   }
 
@@ -187,6 +208,31 @@ object Terms {
         for {
           prevTerm <- removeNamesChk(prev, ctx)
         } yield WrapInf(Succ(prevTerm))
+      case P.TNil(tpe) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+        } yield WrapInf(TNil(tpe1))
+      case P.Vec(tpe, len) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          len1 <- removeNamesChk(len, ctx)
+        } yield WrapInf(Vec(tpe1, len1))
+      case P.Cons(tpe, len, head, tail) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          len1 <- removeNamesChk(len, ctx)
+          head1 <- removeNamesChk(head, ctx)
+          tail1 <- removeNamesChk(tail, ctx)
+        } yield WrapInf(Cons(tpe1, len1, head1, tail1))
+      case P.VecElim(tpe, mot, base, ind, len, arg) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          mot1 <- removeNamesChk(mot, ctx)
+          base1 <- removeNamesChk(base, ctx)
+          ind1 <- removeNamesChk(ind, ctx)
+          len1 <- removeNamesChk(len, ctx)
+          arg1 <- removeNamesChk(arg, ctx)
+        } yield WrapInf(VecElim(tpe1, mot1, base1, ind1, len1, arg1))
     }
   }
 
@@ -208,6 +254,7 @@ object Terms {
   }
 
   def showInf(level: Int, term: InfTerm, names: List[String]): String = {
+    def sc(term: ChkTerm): String = showChk(level, term, names)
     term match {
       case Ann(term1, tpe) => "(" ++ showChk(level, term1, names) ++ ")" ++ " :: " ++ showChk(level, tpe, names)
       case Star => "*"
@@ -227,11 +274,19 @@ object Terms {
         numToDec(WrapInf(succ)) match {
           case Some(dec) => dec.toString
           case None =>
-            s"Succ(${showChk(level, pred, names)})"
+            s"succ(${showChk(level, pred, names)})"
         }
       case NatElim(motive, base, ind, num) =>
         def recChk(term: ChkTerm): String = showChk(level, term, names)
-        s"natElim(${recChk(motive)}, ${recChk(base)}, ${recChk(ind)}, ${recChk(num)})"
+        s"nelim(${recChk(motive)}, ${recChk(base)}, ${recChk(ind)}, ${recChk(num)})"
+      case TNil(tpe) =>
+        s"nil(${showChk(level, tpe, names)})"
+      case Cons(tpe, len, head, tail) =>
+        s"cons(${sc(tpe)}, ${sc(len)}, ${sc(head)}, ${sc(tail)})"
+      case VecElim(tpe, mot, base, ind, len, vec) =>
+        s"velim(${sc(tpe)}, ${sc(mot)}, ${sc(base)}, ${sc(ind)}, ${sc(len)}, ${sc(vec)})"
+      case Vec(tpe, len) =>
+        s"Vec(${sc(tpe)}, ${sc(len)})"
     }
   }
 
