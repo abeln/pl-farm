@@ -29,10 +29,14 @@ object Parsers extends JavaTokenParsers {
   case class Var(name: String) extends Tree
   case class App(fn: Tree, arg: Tree) extends Tree
   case class Lam(binder: String, body: Tree) extends Tree
+  case class Num(n: Int) extends Tree
+  case class NatElim(motive: Tree, base: Tree, ind: Tree, num: Tree) extends Tree
+  case object Nat extends Tree
+//  case class Succ(prev: Tree) extends Tree
 
   def sexp[T](p: Parser[T]): Parser[T] = ("(" ~> p) <~ ")"
 
-  def tree: Parser[Tree] = ann | star | pi | arrow | free | app | lam
+  def tree: Parser[Tree] = ann | star | pi | arrow | nat | free | app | lam | num | natElim
   def ann: Parser[Tree] =  sexp(("::" ~> tree) ~ tree) ^^ { case ~(term, tpe) => Ann(term, tpe) }
   def star: Parser[Tree] = "*" ^^ { _ => Star }
   def pi: Parser[Tree] = sexp(("pi" ~> ident) ~ (tree ~ tree)) ^^ {
@@ -44,4 +48,13 @@ object Parsers extends JavaTokenParsers {
   def free: Parser[Tree] = ident ^? { case id if id != "*" => Var(id) }
   def app: Parser[Tree] = sexp(tree ~ tree) ^^ { case ~(fn, arg) => App(fn, arg) }
   def lam: Parser[Tree] = sexp(("lam" ~> ident) ~ tree) ^^ { case ~(binder, body) => Lam(binder, body) }
+  def num: Parser[Tree] = decimalNumber ^^ { decStr => Num(decStr.toInt) }
+
+  def nat: Parser[Tree] = "Nat" ^^ { _ => Nat }
+
+  def natElim: Parser[Tree] = sexp(((("natelim" ~> tree) ~ tree) ~ tree) ~ tree) ^^ {
+    case ~(~(~(mot, base), ind), num) => NatElim(mot, base, ind, num)
+  }
+
+//  def succ: Parser[Tree] = sexp((""))
 }

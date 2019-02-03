@@ -13,6 +13,10 @@ object Terms {
   case class Bound(binder: Int) extends InfTerm
   case class Free(name: Name) extends InfTerm
   case class App(fn: InfTerm, arg: ChkTerm) extends InfTerm
+  case object Nat extends InfTerm
+  case object Zero extends InfTerm
+  case class Succ(n: ChkTerm) extends InfTerm
+  case class NatElim(motive: ChkTerm, base: ChkTerm, ind: ChkTerm, num: ChkTerm) extends InfTerm
 
   sealed trait ChkTerm
   case class WrapInf(term: InfTerm) extends ChkTerm
@@ -23,27 +27,38 @@ object Terms {
   case object VStar extends Value
   case class VPi(from: Value, to: Value => Value) extends Value
   case class VNeutral(neutral: Neutral) extends Value
+  case object VNat extends Value
+  case object VZero extends Value
+  case class VSucc(n: Value) extends Value
 
   sealed trait Neutral
+  case class NValue(value: Value) extends Neutral
   case class NFree(name: Name) extends Neutral
-  case class NApp(fn: Neutral, arg: Value) extends Neutral
-  case object NStar extends Neutral
-  case class NPi(from: Value, to: Value => Value) extends Neutral
+  case class NApp(fn: Value, arg: Value) extends Neutral
+  case class NNatElim(motive: Value, base: Value, ind: Value, num: Value) extends Neutral
 
   type Type = Value // dependent types!
 
   def vfree(name: Name): Value = VNeutral(NFree(name))
 
   def substInf(level: Int, term: InfTerm, free: Free): InfTerm = {
+    def recChk(term: ChkTerm): ChkTerm = {
+      substCheck(level, term, free)
+    }
     term match {
       case Ann(term1, tpe) => Ann(substCheck(level, term1, free), tpe)
       case Star => Star
-      case Pi(from, to) => Pi(substCheck(level, from, free), substCheck(level + 1, to, free))
+      case Pi(from, to) => Pi(recChk(from), substCheck(level + 1, to, free))
       case Bound(binder) =>
         if (binder == level) free
         else term
       case _: Free => term
-      case App(fn, arg) => App(substInf(level, fn, free), substCheck(level, arg, free))
+      case App(fn, arg) => App(substInf(level, fn, free), recChk(arg))
+      case Nat => Nat
+      case Zero => Zero
+      case Succ(prev) => Succ(substCheck(level, prev, free))
+      case NatElim(motive, base, ind, num) =>
+        NatElim(recChk(motive), recChk(base), recChk(ind), recChk(num))
     }
   }
 
@@ -54,14 +69,21 @@ object Terms {
     }
   }
 
-  def equiv(tp1: Value, tp2: Value): Boolean = {
-    quote0(tp1) == quote0(tp2)
+  def equiv(vl1: Value, vl2: Value): Boolean = {
+    quote0(vl1) == quote0(vl2)
   }
 
-  def quote0(tp: Value): ChkTerm = quote(0, tp)
+  def quote0(vl: Value): ChkTerm = quote(0, vl)
 
-  def quote(level: Int, tp: Value): ChkTerm = {
-    tp match {
+  def quoteInf(level: Int, vl: Value): InfTerm = {
+    quote(level, vl) match {
+      case WrapInf(infTerm) => infTerm
+      case _ => sys.error("internal error: quoteInf0 internal error")
+    }
+  }
+
+  def quote(level: Int, vl: Value): ChkTerm = {
+    vl match {
       case VLam(fn) =>
         val fv = vfree(Quote(level))
         Lam(quote(level + 1, fn(fv)))
@@ -70,19 +92,19 @@ object Terms {
         val fv = vfree(Quote(level))
         WrapInf(Pi(quote(level, from), quote(level + 1, to(fv))))
       case VNeutral(neutral) => WrapInf(quoteNeutral(level, neutral))
+      case VZero => WrapInf(Zero)
+      case VSucc(pred) => WrapInf(Succ(quote(level, pred)))
+      case VNat => WrapInf(Nat)
     }
   }
 
   def quoteNeutral(level: Int, neutral: Neutral): InfTerm = {
     neutral match {
       case NFree(name) => boundFree(level, name)
-      case NApp(fn, arg) => App(quoteNeutral(level, fn), quote(level, arg))
-      case NStar => Star
-      case NPi(from, to) =>
-        val from1 = quote(level, from)
-        val fv = vfree(Quote(level))
-        val to1 = quote(level + 1, to(fv))
-        Pi(from1, to1)
+      case NApp(fn, arg) => App(quoteInf(level, fn), quote(level, arg))
+      case NNatElim(motive, base, ind, num) =>
+        NatElim(quote(level, motive), quote(level, base), quote(level, ind), quote(level, num))
+      case NValue(vl) => quoteInf(level, vl)
     }
   }
 
@@ -146,6 +168,21 @@ object Terms {
         for {
           body1 <- removeNamesChk(body, binder :: ctx)
         } yield Lam(body1)
+      case P.Num(n) =>
+        def expand(n: Int): ChkTerm = {
+          assert(n >= 0)
+          if (n == 0) WrapInf(Zero)
+          else WrapInf(Succ(expand(n - 1)))
+        }
+        Right(expand(n))
+      case P.NatElim(mot, base, ind, num) =>
+        for {
+          motTerm <- removeNamesChk(mot, ctx)
+          baseTerm <- removeNamesChk(base, ctx)
+          indTerm <- removeNamesChk(ind, ctx)
+          numTerm  <- removeNamesChk(num, ctx)
+        } yield WrapInf(NatElim(motTerm, baseTerm, indTerm, numTerm))
+      case P.Nat => Right(WrapInf(Nat))
     }
   }
 
@@ -177,6 +214,28 @@ object Terms {
           case _ => sys.error(s"unexpected name $name")
         }
       case App(fn, arg) => "(" ++ showInf(level, fn, names) ++ ") " ++ showChk(level, arg, names)
+      case Nat => "Nat"
+      case Zero => "0"
+      case succ@Succ(pred) =>
+        numToDec(WrapInf(succ)) match {
+          case Some(dec) => dec.toString
+          case None =>
+            s"Succ(${showChk(level, pred, names)})"
+        }
+      case NatElim(motive, base, ind, num) =>
+        def recChk(term: ChkTerm): String = showChk(level, term, names)
+        s"natElim(${recChk(motive)}, ${recChk(base)}, ${recChk(ind)}, ${recChk(num)})"
+    }
+  }
+
+  def numToDec(num: ChkTerm): Option[Int] = {
+    num match {
+      case WrapInf(Succ(prev)) =>
+        for {
+          p <- numToDec(prev)
+        } yield p + 1
+      case WrapInf(Zero) => Some(0)
+      case _ => None
     }
   }
 }

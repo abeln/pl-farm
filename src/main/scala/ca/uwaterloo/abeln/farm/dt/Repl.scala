@@ -44,6 +44,10 @@ object Repl {
       case P.Lam(binder, body) =>
         val tmap1 = tmap - binder
         P.Lam(binder, close(body, tmap1))
+      case P.Num(n) => P.Num(n)
+      case P.NatElim(mot, base, ind, num) =>
+        P.NatElim(close(mot, tmap), close(base, tmap), close(ind, tmap), close(num, tmap))
+      case P.Nat => P.Nat
     }
   }
 

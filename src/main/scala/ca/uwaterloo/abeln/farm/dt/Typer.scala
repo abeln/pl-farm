@@ -4,7 +4,7 @@ import ca.uwaterloo.abeln.farm.dt.Names.Local
 import ca.uwaterloo.abeln.farm.dt.Terms._
 import ca.uwaterloo.abeln.farm.dt.Names.Name
 import ca.uwaterloo.abeln.farm.dt.Results.{Result, error}
-import ca.uwaterloo.abeln.farm.dt.Eval.{evalChk, emptyEnv}
+import ca.uwaterloo.abeln.farm.dt.Eval.{evalChk, emptyEnv, evalApp}
 
 
 object Typer {
@@ -55,6 +55,24 @@ object Typer {
             error(s"expected a dependent function type, but got: $wrongTpe")
           case err: Left[String, Type] => err
         }
+      case Nat => Right(VStar)
+      case Zero => Right(VNat)
+      case Succ(pred) =>
+       for {
+         _ <- typeCheck(level, ctx, pred, VNat)
+       } yield VNat
+      case NatElim(mot, base, ind, num) =>
+       val res = for {
+         _ <- typeCheck(level, ctx, mot, VPi(VNat, _ => VStar))
+         motVal = evalChk(mot, Nil)
+         expZeroTpe = evalApp(motVal, VZero)
+         _ <- typeCheck(level, ctx, base, expZeroTpe)
+         expIndTpe = VPi(VNat, (prev: Value) => VPi(evalApp(motVal, prev), _ => evalApp(motVal, VSucc(prev))))
+         _ <- typeCheck(level, ctx, ind, expIndTpe)
+         _ <- typeCheck(level, ctx, num, VNat)
+         numVal = evalChk(num, Nil)
+       } yield evalApp(motVal, numVal)
+       res
     }
 //    println(s"inf level = $level term = $term ctx = $ctx res = $res")
     res
@@ -78,8 +96,9 @@ object Typer {
             val name = Local(level)
             val ctx1 = (name, from) :: ctx
             val body1 = substCheck(0, body, Free(name))
-            typeCheck(level + 1, ctx1, body1, to(vfree(name)))
-            Right(())
+            for {
+              _ <- typeCheck(level + 1, ctx1, body1, to(vfree(name)))
+            } yield ()
           case _ => error(s"typing a lambda, but proto is $proto")
         }
     }
