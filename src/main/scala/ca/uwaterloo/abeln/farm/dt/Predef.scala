@@ -17,5 +17,9 @@ object Predef {
       |
       | ((((append 2) v1) 2) v2)
       |
+      | (let eqTpe (Pi a Nat (Pi b Nat (=> (Eq Nat a b) (Eq Nat b a)))))|
+      | (let eqSymm (:: (lam a (lam b (lam ev (eqElim Nat (lam a (lam b (lam ev (Eq Nat b a)))) (lam z (refl Nat z)) a b ev)))) eqTpe))
+      |
+      |
     """.stripMargin.lines.toList
 }

@@ -18,7 +18,7 @@ object Parsers extends JavaTokenParsers {
   case class Assume(id: String, tpe: Tree) extends Cmd
   case class Expr(tree: Tree) extends Cmd
 
-  def cmd: Parser[Cmd] = let | expr | assume
+  def cmd: Parser[Cmd] = let | assume | expr
   def let: Parser[Cmd] = sexp(("let" ~> ident) ~ tree) ^^ { case ~(id, expr) => Let(id, expr) }
   def expr: Parser[Cmd] = tree ^^ Expr
   def assume: Parser[Cmd] = sexp(("assume" ~> ident) ~ tree) ^^ { case ~(id, tpe) => Assume(id, tpe) }
@@ -57,7 +57,12 @@ object Parsers extends JavaTokenParsers {
     case ~(from, to) => Arrow(from, to)
   }
   def free: Parser[Tree] = ident ^? { case id if id != "*" => Var(id) }
-  def app: Parser[Tree] = sexp(tree ~ tree) ^^ { case ~(fn, arg) => App(fn, arg) }
+  def app: Parser[Tree] = sexp(tree ~ rep1(tree)) ^^ {
+    case ~(fn, args) =>
+      args.foldLeft(fn) {
+        case (fn1, arg) => App(fn1, arg)
+      }
+  }
   def lam: Parser[Tree] = sexp(("lam" ~> ident) ~ tree) ^^ { case ~(binder, body) => Lam(binder, body) }
   def num: Parser[Tree] = decimalNumber ^^ { decStr => Num(decStr.toInt) }
 
