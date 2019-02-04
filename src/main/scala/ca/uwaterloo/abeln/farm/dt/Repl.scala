@@ -104,8 +104,21 @@ object Repl {
     Predef.defs.filter(_.trim.nonEmpty).foreach(proc)
     def loop(): Unit = {
       print(">> ")
-      val line = readLine()
-      proc(line)
+      var prog = ""
+      var parensCount = 0
+      do {
+        val line = readLine()
+        parensCount += line.foldLeft(0) {
+          case (acc, c) =>
+            c match {
+              case '(' => acc + 1
+              case ')' => acc - 1
+              case _ => acc
+            }
+        }
+        prog += (" " + line)
+      } while (parensCount > 0)
+      proc(prog)
       loop()
     }
     loop()

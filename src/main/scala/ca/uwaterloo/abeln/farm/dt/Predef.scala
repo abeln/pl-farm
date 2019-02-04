@@ -17,8 +17,14 @@ object Predef {
       |
       | ((((append 2) v1) 2) v2)
       |
-      | (let eqTpe (Pi a Nat (Pi b Nat (=> (Eq Nat a b) (Eq Nat b a)))))|
-      | (let eqSymm (:: (lam a (lam b (lam ev (eqElim Nat (lam a (lam b (lam ev (Eq Nat b a)))) (lam z (refl Nat z)) a b ev)))) eqTpe))
+      | (let symmTpe (Pi a Nat (Pi b Nat (=> (Eq Nat a b) (Eq Nat b a)))))|
+      | (let eqSymm (:: (lam a (lam b (lam ev (eqElim Nat (lam a (lam b (lam ev (Eq Nat b a)))) (lam z (refl Nat z)) a b ev)))) symmTpe))
+      |
+      | (let plusCommTpe (Pi n Nat (Eq Nat (plus (succ n) 0) (succ (plus n 0)))))
+      | (let plusComm (:: (lam n (refl Nat (plus (succ n) 0))) plusCommTpe))
+      |
+      | (let plusCommTpe2 (Pi n Nat (Eq Nat (succ (plus n 0)) (plus (succ n) 0))))
+      | (let plusComm2 (:: (lam n (eqSymm (plus (succ n) 0) (succ (plus n 0)) (plusComm n))) plusCommTpe2))
       |
       |
     """.stripMargin.lines.toList
