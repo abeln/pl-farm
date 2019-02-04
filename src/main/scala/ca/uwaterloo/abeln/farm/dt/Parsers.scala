@@ -50,7 +50,7 @@ object Parsers extends JavaTokenParsers {
 
   def ann: Parser[Tree] =  sexp(("::" ~> tree) ~ tree) ^^ { case ~(term, tpe) => Ann(term, tpe) }
   def star: Parser[Tree] = "*" ^^ { _ => Star }
-  def pi: Parser[Tree] = sexp(("pi" ~> ident) ~ (tree ~ tree)) ^^ {
+  def pi: Parser[Tree] = sexp(("Pi" ~> ident) ~ (tree ~ tree)) ^^ {
     case ~(id, ~(from, to)) => Pi(id, from, to)
   }
   def arrow: Parser[Tree] = sexp("=>" ~> (tree ~ tree)) ^^ {

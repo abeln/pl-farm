@@ -56,6 +56,12 @@ object Repl {
         P.Cons(cl(tpe), cl(len), cl(head), cl(tail))
       case P.VecElim(tpe, mot, base, ind, len, arg) =>
         P.VecElim(cl(tpe), cl(mot), cl(base), cl(ind), cl(len), cl(arg))
+      case P.TEq(tpe, a, b) =>
+        P.TEq(cl(tpe), cl(a), cl(b))
+      case P.Refl(tpe, e) =>
+        P.Refl(cl(tpe), cl(e))
+      case P.EqElim(tpe, mot, prop, a, b, ev) =>
+        P.EqElim(cl(tpe), cl(mot), cl(prop), cl(a), cl(b), cl(ev))
     }
   }
 
