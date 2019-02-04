@@ -21,6 +21,9 @@ object Terms {
   case class TNil(tpe: ChkTerm) extends InfTerm
   case class Cons(tpe: ChkTerm, len: ChkTerm, head: ChkTerm, vec: ChkTerm) extends InfTerm
   case class VecElim(tpe: ChkTerm, motive: ChkTerm, base: ChkTerm, ind: ChkTerm, len: ChkTerm, vec: ChkTerm) extends InfTerm
+  case class TEq(tpe: ChkTerm, a: ChkTerm, b: ChkTerm) extends InfTerm
+  case class Refl(tpe: ChkTerm, e: ChkTerm) extends InfTerm
+  case class EqElim(tpe: ChkTerm, motive: ChkTerm, prop: ChkTerm, a: ChkTerm, b: ChkTerm, ev: ChkTerm) extends InfTerm
 
   sealed trait ChkTerm
   case class WrapInf(term: InfTerm) extends ChkTerm
@@ -37,6 +40,8 @@ object Terms {
   case class VVec(tpe: Value, len: Value) extends Value
   case class VNil(tpe: Value) extends Value
   case class VCons(tpe: Value, len: Value, head: Value, tail: Value) extends Value
+  case class VEq(tpe: Value, a: Value, b: Value) extends Value
+  case class VRefl(tpe: Value, e: Value) extends Value
 
   sealed trait Neutral
   case class NValue(value: Value) extends Neutral
@@ -44,6 +49,7 @@ object Terms {
   case class NApp(fn: Value, arg: Value) extends Neutral
   case class NNatElim(motive: Value, base: Value, ind: Value, num: Value) extends Neutral
   case class NVecElim(tpe: Value, motive: Value, base: Value, ind: Value, argLen: Value, argVec: Value) extends Neutral
+//  case class NEqElim(tpe: Value, motive: Value, prop: Value, a: Value, b: Value, ev: Value) extends Neutral
 
   type Type = Value // dependent types!
 
@@ -73,6 +79,12 @@ object Terms {
         Cons(recChk(tpe), recChk(len), recChk(head), recChk(vec))
       case VecElim(tpe, motive, base, ind, len, vec) =>
         VecElim(recChk(tpe), recChk(motive), recChk(base), recChk(ind), recChk(len), recChk(vec))
+      case TEq(tpe, a, b) =>
+        TEq(recChk(tpe), recChk(a), recChk(b))
+      case Refl(tpe, e) =>
+        Refl(recChk(tpe), recChk(e))
+      case EqElim(tpe, mot, prop, a, b, ev) =>
+        EqElim(recChk(tpe), recChk(mot), recChk(prop), recChk(a), recChk(b), recChk(ev))
     }
   }
 
@@ -113,6 +125,10 @@ object Terms {
       case VNil(tpe) => WrapInf(TNil(quote(level, tpe)))
       case VCons(tpe, len, head, tail) =>
         WrapInf(Cons(quote(level, tpe), quote(level, len), quote(level, head), quote(level, tail)))
+      case VEq(tpe, a, b) =>
+        WrapInf(TEq(quote(level, tpe), quote(level, a), quote(level, b)))
+      case VRefl(tpe, e) =>
+        WrapInf(Refl(quote(level, tpe), quote(level, e)))
     }
   }
 
@@ -233,6 +249,26 @@ object Terms {
           len1 <- removeNamesChk(len, ctx)
           arg1 <- removeNamesChk(arg, ctx)
         } yield WrapInf(VecElim(tpe1, mot1, base1, ind1, len1, arg1))
+      case P.TEq(tpe, a, b) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          a1 <- removeNamesChk(a, ctx)
+          b1 <- removeNamesChk(b, ctx)
+        } yield WrapInf(TEq(tpe1, a1, b1))
+      case P.Refl(tpe, e) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          e1 <- removeNamesChk(e, ctx)
+        } yield WrapInf(Refl(tpe1, e1))
+      case P.EqElim(tpe, mot, prop, a, b, ev) =>
+        for {
+          tpe1 <- removeNamesChk(tpe, ctx)
+          mot1 <- removeNamesChk(mot, ctx)
+          prop1 <- removeNamesChk(prop, ctx)
+          a1 <- removeNamesChk(a, ctx)
+          b1 <- removeNamesChk(b, ctx)
+          ev1 <- removeNamesChk(ev, ctx)
+        } yield WrapInf(EqElim(tpe1, mot1, prop1, a1, b1, ev1))
     }
   }
 
@@ -278,15 +314,21 @@ object Terms {
         }
       case NatElim(motive, base, ind, num) =>
         def recChk(term: ChkTerm): String = showChk(level, term, names)
-        s"nelim(${recChk(motive)}, ${recChk(base)}, ${recChk(ind)}, ${recChk(num)})"
+        s"natElim(${recChk(motive)}, ${recChk(base)}, ${recChk(ind)}, ${recChk(num)})"
       case TNil(tpe) =>
         s"nil(${showChk(level, tpe, names)})"
       case Cons(tpe, len, head, tail) =>
         s"cons(${sc(head)}, ${sc(tail)})"
       case VecElim(tpe, mot, base, ind, len, vec) =>
-        s"velim(${sc(tpe)}, ${sc(mot)}, ${sc(base)}, ${sc(ind)}, ${sc(len)}, ${sc(vec)})"
+        s"vecElim(${sc(tpe)}, ${sc(mot)}, ${sc(base)}, ${sc(ind)}, ${sc(len)}, ${sc(vec)})"
       case Vec(tpe, len) =>
         s"Vec(${sc(tpe)}, ${sc(len)})"
+      case TEq(tpe, a, b) =>
+        s"Eq(${sc(tpe)}, ${sc(a)}, ${sc(b)})"
+      case Refl(tpe, e) =>
+        s"refl(${sc(tpe)}, ${sc(e)})"
+      case EqElim(tpe, mot, prop, a, b, ev) =>
+        s"eqElim(${sc(tpe)}, ${sc(mot)}, ${sc(prop)}, ${sc(a)}, ${sc(b)}, ${sc(ev)})"
     }
   }
 

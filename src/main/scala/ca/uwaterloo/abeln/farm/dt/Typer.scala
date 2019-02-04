@@ -124,6 +124,37 @@ object Typer {
          _ <- typeCheck(level, ctx, argVec, VVec(vTpe, vLen))
          vVec = evalChk(argVec, Nil)
        } yield evalCurriedApp(vMotive, vLen, vVec)
+      case TEq(tpe, a, b) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         _ <- typeCheck(level, ctx, a, vTpe)
+         _ <- typeCheck(level, ctx, b, vTpe)
+       } yield VStar
+      case Refl(tpe, e) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         _ <- typeCheck(level, ctx, e, vTpe)
+         vE = evalChk(e, Nil)
+       } yield VEq(vTpe, vE, vE)
+      case EqElim(tpe, mot, prop, a, b, ev) =>
+       for {
+         _ <- typeCheck(level, ctx, tpe, VStar)
+         vTpe = evalChk(tpe, Nil)
+         expMotTpe = VPi(vTpe, (x: Value) => VPi(vTpe, (y: Value) => VPi(VEq(vTpe, x, y), (ev: Value) => VStar)))
+         _ <- typeCheck(level, ctx, mot, expMotTpe)
+         vMot = evalChk(mot, Nil)
+         expPropTpe = VPi(vTpe, z => evalCurriedApp(vMot, z, z, VRefl(vTpe, z)))
+         _ <- typeCheck(level, ctx, prop, expPropTpe)
+         vProp = evalChk(prop, Nil)
+         _ <- typeCheck(level, ctx, a, vTpe)
+         vA = evalChk(a, Nil)
+         _ <- typeCheck(level, ctx, b, vTpe)
+         vB = evalChk(b, Nil)
+         _ <- typeCheck(level, ctx, ev, VEq(vTpe, vA, vB))
+         vEv = evalChk(ev, Nil)
+       } yield evalCurriedApp(vMot, vA, vB, vEv)
     }
 //    println(s"inf level = $level term = $term ctx = $ctx res = $res")
     res

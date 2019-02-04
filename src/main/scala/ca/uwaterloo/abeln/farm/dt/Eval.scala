@@ -74,6 +74,18 @@ object Eval {
           }
         }
         elim(vArgLen, vArgVec)
+      case TEq(tpe, a, b) =>
+        VEq(evalChk(tpe, env), evalChk(a, env), evalChk(b, env))
+      case Refl(tpe, e) =>
+        VRefl(evalChk(tpe, env), evalChk(e, env))
+      case EqElim(tpe, mot, prop, a, b, ev) =>
+        val vTpe = evalChk(tpe, env)
+        val vMot = evalChk(mot, env)
+        val vProp = evalChk(prop, env)
+        val vA = evalChk(a, env)
+        val vB = evalChk(b, env)
+        val vEv = evalChk(ev, env)
+        evalApp(vProp, vA)
     }
   }
 
